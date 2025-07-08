@@ -7,24 +7,39 @@ $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int) $_GET['page'] 
 $offset = ($page - 1) * $limit;
 
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
-$params = [$_SESSION['user_id']];
+$params = [];
 $search_sql = '';
+$role = $_SESSION['role'];
 
+// 🔐 Editor/Admin can see all posts; viewer only their own
+$where_sql = '';
+if ($role === 'viewer') {
+    $where_sql = "WHERE posts.user_id = ?";
+    $params[] = $_SESSION['user_id'];
+} else {
+    $where_sql = "WHERE 1=1";
+}
+
+// 🔍 Search logic
 if ($search) {
-    $search_sql = "AND (title LIKE ? OR content LIKE ?)";
+    $search_sql = " AND (title LIKE ? OR content LIKE ?)";
     $params[] = "%$search%";
     $params[] = "%$search%";
 }
 
-$count_stmt = $pdo->prepare("SELECT COUNT(*) FROM posts WHERE user_id = ? $search_sql");
+// Count total posts
+$count_stmt = $pdo->prepare("SELECT COUNT(*) FROM posts $where_sql $search_sql");
 $count_stmt->execute($params);
 $total_posts = $count_stmt->fetchColumn();
 $total_pages = ceil($total_posts / $limit);
 
-$sql = "SELECT posts.*, users.username FROM posts 
+// Fetch posts with user info
+$sql = "SELECT posts.*, users.username 
+        FROM posts 
         JOIN users ON posts.user_id = users.id 
-        WHERE posts.user_id = ? $search_sql 
-        ORDER BY posts.created_at DESC LIMIT $limit OFFSET $offset";
+        $where_sql $search_sql 
+        ORDER BY posts.created_at DESC 
+        LIMIT $limit OFFSET $offset";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $posts = $stmt->fetchAll();
@@ -44,17 +59,25 @@ $posts = $stmt->fetchAll();
     <button class="btn btn-outline-primary">Search</button>
   </form>
 
-  <a href="create_post.php" class="btn btn-success mb-3">+ New Post</a>
+  <?php if (in_array($role, ['admin', 'editor'])): ?>
+    <a href="create_post.php" class="btn btn-success mb-3">+ New Post</a>
+  <?php endif; ?>
 
   <?php foreach ($posts as $post): ?>
     <div class="card mb-3">
       <div class="card-body">
         <h5><?= htmlspecialchars($post['title']) ?></h5>
         <p><?= nl2br(htmlspecialchars(substr($post['content'], 0, 200))) ?></p>
-        <small class="text-muted">By <?= $post['username'] ?> on <?= $post['created_at'] ?></small>
+        <small class="text-muted">By <?= htmlspecialchars($post['username']) ?> on <?= $post['created_at'] ?></small>
         <div class="mt-2">
-          <a href="edit_post.php?id=<?= $post['id'] ?>" class="btn btn-sm btn-primary">Edit</a>
-          <a href="delete_post.php?id=<?= $post['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this post?')">Delete</a>
+          <?php
+          // Allow edit/delete if owner or editor/admin
+          $canEdit = ($post['user_id'] == $_SESSION['user_id']) || in_array($role, ['editor', 'admin']);
+          ?>
+          <?php if ($canEdit): ?>
+            <a href="edit_post.php?id=<?= $post['id'] ?>" class="btn btn-sm btn-primary">Edit</a>
+            <a href="delete_post.php?id=<?= $post['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this post?')">Delete</a>
+          <?php endif; ?>
         </div>
       </div>
     </div>

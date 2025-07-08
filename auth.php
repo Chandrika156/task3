@@ -16,9 +16,15 @@ function require_login() {
 function current_user() {
     global $pdo;
     if (is_logged_in()) {
-        $stmt = $pdo->prepare("SELECT id, username FROM users WHERE id = ?");
+        $stmt = $pdo->prepare("SELECT id, username, role FROM users WHERE id = ?");
         $stmt->execute([$_SESSION['user_id']]);
         return $stmt->fetch();
     }
     return null;
+}
+
+function require_role($roles = []) {
+    if (!is_logged_in() || !in_array($_SESSION['role'], $roles)) {
+        die("Access denied.");
+    }
 }

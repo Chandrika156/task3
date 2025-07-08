@@ -1,6 +1,9 @@
 <?php
 require 'auth.php';
-require_login();
+require_login(); // This allows any logged-in user
+
+// Optional: If you want to prevent "viewer" from posting, uncomment this line
+// require_role(['admin', 'editor']);
 
 $title = $content = '';
 $errors = [];
@@ -8,7 +11,7 @@ $errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title']);
     $content = trim($_POST['content']);
-    
+
     if (!$title || !$content) {
         $errors[] = "Title and content are required.";
     } else {
@@ -31,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="container mt-4">
     <h2>Create New Post</h2>
     <?php foreach ($errors as $error): ?>
-        <div class="alert alert-danger"><?= $error ?></div>
+        <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
     <?php endforeach; ?>
     <form method="post">
         <div class="mb-3">
@@ -48,4 +51,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 </body>
 </html>
-
